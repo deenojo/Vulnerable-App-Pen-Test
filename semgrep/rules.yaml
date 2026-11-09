@@ -1,0 +1,63 @@
+rules:
+  - id: formatted-sql-string
+    languages: [python]
+    severity: ERROR
+    message: >
+      SQL built with string formatting is injectable (CWE-89, OWASP A03). Pass values as
+      parameters: cursor.execute("... WHERE x = ?", (value,)).
+    metadata: {owasp: "A03:2021", cwe: "CWE-89", finding: F01}
+    patterns:
+      - pattern-either:
+          - pattern: $CUR.execute("..." % ...)
+          - pattern: $CUR.execute("..." + ...)
+          - pattern: $CUR.execute(f"...{...}...")
+          - pattern: $CUR.execute("...".format(...))
+
+  - id: jinja-unescaped-output
+    languages: [python]
+    severity: ERROR
+    message: >
+      Rendering untrusted input without escaping enables XSS (CWE-79, OWASP A03).
+      render_template_string on user input, or the |safe filter, bypasses autoescaping.
+    metadata: {owasp: "A03:2021", cwe: "CWE-79", finding: F03}
+    pattern-either:
+      - pattern: flask.render_template_string(...)
+      - pattern: render_template_string(...)
+
+  - id: ssrf-request-from-user-input
+    languages: [python]
+    severity: ERROR
+    message: >
+      Fetching a user-supplied URL without validation is SSRF (CWE-918, OWASP A10). Validate the
+      scheme, allowlist the host, and block private/metadata addresses before the request.
+    metadata: {owasp: "A10:2021", cwe: "CWE-918", finding: F04}
+    patterns:
+      - pattern-either:
+          - pattern: requests.get(flask.request.$ANY.get(...), ...)
+          - pattern: requests.get(request.$ANY.get(...), ...)
+          - pattern: requests.get(request.$ANY[...], ...)
+          - pattern: urllib.request.urlopen(request.$ANY.get(...), ...)
+
+  - id: weak-password-hash
+    languages: [python]
+    severity: ERROR
+    message: >
+      MD5/SHA1/unsalted SHA256 are not password hashes (CWE-916, OWASP A02). Use bcrypt, scrypt
+      or argon2 with a per-password salt.
+    metadata: {owasp: "A02:2021", cwe: "CWE-916", finding: F05}
+    patterns:
+      - pattern-either:
+          - pattern: hashlib.md5($PW).hexdigest()
+          - pattern: hashlib.sha1($PW).hexdigest()
+      - metavariable-regex:
+          metavariable: $PW
+          regex: (?i).*(pass|pwd|secret).*
+
+  - id: flask-debug-enabled
+    languages: [python]
+    severity: WARNING
+    message: >
+      Flask debug mode exposes the Werkzeug console (RCE) and stack traces (CWE-489, OWASP A05).
+      Never enable it in a deployed app.
+    metadata: {owasp: "A05:2021", cwe: "CWE-489", finding: F06}
+    pattern: $APP.run(..., debug=True, ...)
